@@ -62,7 +62,7 @@ function PublisherReportsBody() {
   }
 
   return (
-    <PermissionGate permission="report:read" redirect>
+    <PermissionGate permission="report:read" superadminOnly redirect>
       <PageHeader
         eyebrow="Publisher"
         title="Report publisher"

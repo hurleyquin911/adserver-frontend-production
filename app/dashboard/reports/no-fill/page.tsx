@@ -60,7 +60,7 @@ function NoFillBody() {
   }
 
   return (
-    <PermissionGate permission="report:read" redirect>
+    <PermissionGate permission="report:read" superadminOnly redirect>
       <PageHeader
         title="No-fill"
         subtitle="Request tanpa creative, per ukuran dan publisher. Fill rate = (request - no_fill) / request."

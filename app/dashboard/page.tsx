@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Modal } from "@/components/Modal";
 import PermissionGate from "@/components/PermissionGate";
 import { Card, EmptyRow, ErrorBanner, PageHeader } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
@@ -22,8 +21,6 @@ type Creative = {
     advertiser?: { id: string; name: string };
   };
 };
-
-type Campaign = { id: string; name: string };
 
 function CreativeStateIcon({ ready }: { ready: boolean }) {
   return (
@@ -57,7 +54,7 @@ function CreativeRow({
   const previewHref = `/dashboard/creatives/${encodeURIComponent(creative.id)}`;
   const nextHref = creative.preview_ready || !canUpload
     ? previewHref
-    : `/dashboard/campaigns?c=${encodeURIComponent(creative.campaign.id)}&fix=${encodeURIComponent(creative.id)}`;
+    : `/dashboard/creatives/upload?fix=${encodeURIComponent(creative.id)}`;
 
   return (
     <tr
@@ -113,21 +110,15 @@ export default function DashboardPage() {
   const { hasPermission } = useAuth();
   const canUpload = hasPermission("creative:upload");
   const [creatives, setCreatives] = useState<Creative[]>([]);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [campaignId, setCampaignId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     async function loadWorkspace() {
       setError(null);
       try {
-        const [creativeResult, campaignResult] = await Promise.all([
-          api<{ data: Creative[] }>("/api/creatives"),
-          canUpload ? api<{ data: Campaign[] }>("/api/campaigns") : Promise.resolve({ data: [] }),
-        ]);
+        const creativeResult = await api<{ data: Creative[] }>("/api/creatives");
         if (cancelled) return;
         const orderedCreatives = [...creativeResult.data].sort((a, b) => {
           const dateDiff =
@@ -135,8 +126,6 @@ export default function DashboardPage() {
           return dateDiff || Number(b.id) - Number(a.id);
         });
         setCreatives(orderedCreatives);
-        setCampaigns(campaignResult.data);
-        setCampaignId((current) => current || campaignResult.data[0]?.id || "");
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof ApiError ? e.message : "Failed to load your creative workspace");
@@ -150,7 +139,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [canUpload]);
+  }, []);
 
   const readyCount = useMemo(
     () => creatives.filter((creative) => creative.preview_ready).length,
@@ -158,12 +147,6 @@ export default function DashboardPage() {
   );
   const attentionCount = creatives.length - readyCount;
   const recentCreatives = creatives.slice(0, 5);
-
-  function continueToUpload() {
-    if (!campaignId) return;
-    setUploadOpen(false);
-    router.push(`/dashboard/campaigns?c=${encodeURIComponent(campaignId)}&upload=1`);
-  }
 
   return (
     <PermissionGate permission="campaign:read" redirect>
@@ -176,7 +159,7 @@ export default function DashboardPage() {
               <button
                 type="button"
                 className="btn-primary inline-flex items-center"
-                onClick={() => setUploadOpen(true)}
+                onClick={() => router.push("/dashboard/creatives/upload")}
               >
                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 16V4m0 0L8 8m4-4l4 4M5 14v5h14v-5" />
@@ -271,40 +254,6 @@ export default function DashboardPage() {
 
         <p className="mt-5 text-xs text-[var(--muted)]">jobosrv. · by Pushlab</p>
 
-        <Modal
-          open={uploadOpen}
-          title="Upload creative"
-          onClose={() => setUploadOpen(false)}
-        >
-          <p className="text-sm text-[var(--muted)]">
-            Choose a campaign first. You can upload the creative from its campaign panel.
-          </p>
-          <label className="mt-4 block text-sm font-medium">
-            Campaign
-            <select
-              className="field mt-1"
-              value={campaignId}
-              onChange={(event) => setCampaignId(event.target.value)}
-              disabled={campaigns.length === 0}
-            >
-              {campaigns.length === 0 ? (
-                <option value="">No campaigns available</option>
-              ) : (
-                campaigns.map((campaign) => (
-                  <option key={campaign.id} value={campaign.id}>{campaign.name}</option>
-                ))
-              )}
-            </select>
-          </label>
-          <div className="mt-5 flex justify-end gap-2">
-            <button type="button" className="btn-ghost" onClick={() => setUploadOpen(false)}>
-              Cancel
-            </button>
-            <button type="button" className="btn-primary" onClick={continueToUpload} disabled={!campaignId}>
-              Continue to upload
-            </button>
-          </div>
-        </Modal>
       </div>
     </PermissionGate>
   );

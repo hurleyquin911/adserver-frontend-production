@@ -201,6 +201,8 @@ export function CampaignCreativesPanel({
   const [height, setHeight] = useState("250");
   const [clickUrl, setClickUrl] = useState("");
   const [cpmUsd, setCpmUsd] = useState("");
+  const [originalCpmUsd, setOriginalCpmUsd] = useState("");
+  const [cpmChangeReason, setCpmChangeReason] = useState("");
   const [status, setStatus] = useState("draft");
   const [file, setFile] = useState<File | null>(null);
 
@@ -255,6 +257,8 @@ export function CampaignCreativesPanel({
     setHeight("250");
     setClickUrl("");
     setCpmUsd("");
+    setOriginalCpmUsd("");
+    setCpmChangeReason("");
     setStatus("draft");
     setFile(null);
     setFormError(null);
@@ -268,6 +272,8 @@ export function CampaignCreativesPanel({
     setHeight(String(row.height));
     setClickUrl(row.click_url || "");
     setCpmUsd(row.cpm_usd == null ? "" : String(row.cpm_usd));
+    setOriginalCpmUsd(row.cpm_usd == null ? "" : String(row.cpm_usd));
+    setCpmChangeReason("");
     setStatus(row.status || "draft");
     setFile(null);
     setFormError(null);
@@ -282,6 +288,8 @@ export function CampaignCreativesPanel({
     setHeight("250");
     setClickUrl("");
     setCpmUsd("");
+    setOriginalCpmUsd("");
+    setCpmChangeReason("");
     setStatus("draft");
     setFile(null);
     setFormError(null);
@@ -290,6 +298,13 @@ export function CampaignCreativesPanel({
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
+    const normalizedRate = cpmUsd.trim() === "" ? null : Number(cpmUsd);
+    const originalRate = originalCpmUsd.trim() === "" ? null : Number(originalCpmUsd);
+    const cpmChanged = showBrand && normalizedRate !== originalRate;
+    if (cpmChanged && cpmChangeReason.trim().length < 5) {
+      setFormError("Tuliskan ketentuan atau alasan perubahan CPM (minimal 5 karakter).");
+      return;
+    }
     setSaving(true);
     try {
       if (editId) {
@@ -300,7 +315,10 @@ export function CampaignCreativesPanel({
           fd.append("width", width);
           fd.append("height", height);
           fd.append("click_url", clickUrl);
-          if (showBrand) fd.append("cpm_usd", cpmUsd);
+          if (cpmChanged) {
+            fd.append("cpm_usd", cpmUsd);
+            fd.append("cpm_change_reason", cpmChangeReason.trim());
+          }
           fd.append("status", status);
           await apiFormData(`/api/creatives/${editId}`, fd, "PATCH");
         } else {
@@ -311,7 +329,9 @@ export function CampaignCreativesPanel({
               width: Number(width),
               height: Number(height),
               click_url: clickUrl || null,
-              ...(showBrand ? { cpm_usd: cpmUsd || null } : {}),
+              ...(cpmChanged
+                ? { cpm_usd: normalizedRate, cpm_change_reason: cpmChangeReason.trim() }
+                : {}),
               status,
             },
           });
@@ -329,7 +349,10 @@ export function CampaignCreativesPanel({
         fd.append("width", width);
         fd.append("height", height);
         fd.append("click_url", clickUrl);
-        if (showBrand) fd.append("cpm_usd", cpmUsd);
+        if (showBrand && normalizedRate != null) {
+          fd.append("cpm_usd", cpmUsd);
+          fd.append("cpm_change_reason", cpmChangeReason.trim());
+        }
         fd.append("status", status);
         await apiFormData("/api/creatives", fd);
       }
@@ -396,6 +419,9 @@ export function CampaignCreativesPanel({
   const startDate = miniReport?.campaign.start_date || campaign.start_date;
   const endDate = miniReport?.campaign.end_date || campaign.end_date;
   const priority = miniReport?.campaign.priority ?? campaign.priority;
+  const cpmRateChanged =
+    (cpmUsd.trim() === "" ? null : Number(cpmUsd)) !==
+    (originalCpmUsd.trim() === "" ? null : Number(originalCpmUsd));
 
   return (
     <div className="creative-panel flex h-full min-h-[32rem] flex-col">
@@ -503,7 +529,7 @@ export function CampaignCreativesPanel({
               <MiniMetric label="Klik" value={num(cm?.click ?? 0)} />
               <MiniMetric label="CTR" value={pct(cm?.ctr_pct ?? 0)} />
               <MiniMetric label="Fill rate" value={pct(cm?.fill_rate_pct ?? 0)} />
-              <MiniMetric label="Request" value={num(cm?.request ?? 0)} />
+              {showBrand && <MiniMetric label="Ad request" value={num(cm?.request ?? 0)} />}
               <MiniMetric label="No fill" value={num(cm?.no_fill ?? 0)} />
               <MiniMetric label="Interaksi" value={num(cm?.interaction_unique ?? 0)} />
               <MiniMetric
@@ -654,7 +680,7 @@ export function CampaignCreativesPanel({
                 <MetricCard label="CTR" value={pct(m?.ctr_pct ?? 0)} />
                 <MetricCard label="Interaksi" value={num(m?.interaction_unique ?? 0)} />
                 <MetricCard label="Interaction rate" value={pct(m?.interaction_rate_pct ?? 0)} />
-                <MetricCard label="Request" value={num(m?.request ?? 0)} />
+                {showBrand && <MetricCard label="Ad request" value={num(m?.request ?? 0)} />}
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[var(--line)] pt-4">
@@ -757,6 +783,23 @@ export function CampaignCreativesPanel({
                 Tarif ini hanya dapat diubah Superadmin. Creative tanpa tarif tidak
                 dihitung dalam estimasi Billing.
               </FieldHint>
+              {(!editId || cpmRateChanged) && (
+                <>
+                  <label className="mt-3 block text-sm font-medium">
+                    Ketentuan / alasan perubahan harga
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={500}
+                    minLength={5}
+                    required={(!editId && cpmUsd.trim() !== "") || cpmRateChanged}
+                    value={cpmChangeReason}
+                    onChange={(e) => setCpmChangeReason(e.target.value)}
+                    className={inputClass}
+                    placeholder="Contoh: Tarif CPM sesuai kontrak periode berjalan"
+                  />
+                </>
+              )}
             </div>
           )}
           <div className="md:col-span-2">

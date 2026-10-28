@@ -161,7 +161,7 @@ function PublisherDetailBody() {
   const devices = data?.devices || [];
 
   return (
-    <PermissionGate permission="report:read" redirect>
+    <PermissionGate permission="report:read" superadminOnly redirect>
       <PageHeader
         eyebrow="Publisher"
         title={pub?.host || "Detail publisher"}

@@ -25,7 +25,7 @@ export function isUsersRole(name?: string | null) {
   return normalizeRoleName(name) === ROLE.USERS;
 }
 
-/** Admin & Users wajib terikat Brand (Superadmin tidak). */
+/** Users harus terikat Brand; Admin dan Superadmin bekerja lintas Brand. */
 export function needsBrand(name?: string | null) {
-  return isAdmin(name) || isUsersRole(name);
+  return isUsersRole(name);
 }

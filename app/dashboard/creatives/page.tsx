@@ -3,7 +3,6 @@
 import { Suspense } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Modal } from "@/components/Modal";
 import PermissionGate from "@/components/PermissionGate";
 import { Card, EmptyRow, ErrorBanner, PageHeader } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
@@ -24,7 +23,6 @@ type Creative = {
   };
 };
 
-type Campaign = { id: string; name: string };
 type Tab = "all" | "ready" | "attention";
 
 const TABS: { id: Tab; label: string }[] = [
@@ -47,7 +45,6 @@ function CreativesContent() {
   const { hasPermission } = useAuth();
   const canUpload = hasPermission("creative:upload");
   const [rows, setRows] = useState<Creative[]>([]);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<Tab>(() => {
     const status = searchParams.get("status");
@@ -56,21 +53,14 @@ function CreativesContent() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [campaignId, setCampaignId] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [creativeResult, campaignResult] = await Promise.all([
-          api<{ data: Creative[] }>("/api/creatives"),
-          api<{ data: Campaign[] }>("/api/campaigns"),
-        ]);
+        const creativeResult = await api<{ data: Creative[] }>("/api/creatives");
         if (cancelled) return;
         setRows(creativeResult.data);
-        setCampaigns(campaignResult.data);
-        setCampaignId(campaignResult.data[0]?.id ?? "");
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof ApiError ? e.message : "Gagal memuat creatives");
@@ -107,12 +97,6 @@ function CreativesContent() {
     });
   }, [rows, query, tab]);
 
-  function startUpload() {
-    if (!campaignId) return;
-    setUploadOpen(false);
-    router.push(`/dashboard/campaigns?c=${encodeURIComponent(campaignId)}&upload=1`);
-  }
-
   return (
     <PermissionGate permission="campaign:read" redirect>
       <PageHeader
@@ -120,7 +104,7 @@ function CreativesContent() {
         subtitle="Manage your files, preview each creative, and generate its ad tag."
         action={
           canUpload ? (
-            <button type="button" className="btn-primary" onClick={() => setUploadOpen(true)}>
+            <button type="button" className="btn-primary" onClick={() => router.push("/dashboard/creatives/upload")}>
               <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 16V4m0 0L8 8m4-4l4 4M5 14v5h14v-5" />
               </svg>
@@ -270,7 +254,7 @@ function CreativesContent() {
                         onClick={(event) => {
                           event.stopPropagation();
                           router.push(
-                            `/dashboard/campaigns?c=${encodeURIComponent(row.campaign.id)}&fix=${encodeURIComponent(row.id)}`
+                            `/dashboard/creatives/upload?fix=${encodeURIComponent(row.id)}`
                           );
                         }}
                       >
@@ -288,41 +272,6 @@ function CreativesContent() {
       </Card>
 
       <p className="mt-5 text-xs text-[var(--muted)]">jobosrv. · by Pushlab</p>
-
-      <Modal
-        open={uploadOpen}
-        title="Upload creative"
-        onClose={() => setUploadOpen(false)}
-      >
-        <p className="text-sm text-[var(--muted)]">
-          Choose a campaign first. You can upload the creative from its campaign panel.
-        </p>
-        <label className="mt-4 block text-sm font-medium">
-          Campaign
-          <select
-            className="field mt-1"
-            value={campaignId}
-            onChange={(event) => setCampaignId(event.target.value)}
-            disabled={campaigns.length === 0}
-          >
-            {campaigns.length === 0 ? (
-              <option value="">No campaigns available</option>
-            ) : (
-              campaigns.map((campaign) => (
-                <option key={campaign.id} value={campaign.id}>{campaign.name}</option>
-              ))
-            )}
-          </select>
-        </label>
-        <div className="mt-5 flex justify-end gap-2">
-          <button type="button" className="btn-ghost" onClick={() => setUploadOpen(false)}>
-            Cancel
-          </button>
-          <button type="button" className="btn-primary" onClick={startUpload} disabled={!campaignId}>
-            Continue to campaign
-          </button>
-        </div>
-      </Modal>
 
     </PermissionGate>
   );

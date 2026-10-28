@@ -198,7 +198,7 @@ const SECTIONS: NavSection[] = [
         href: "/dashboard/billing",
         label: "Billing",
         permission: "report:read",
-        roles: ["Admin", "Users"],
+        roles: ["Superadmin", "Admin", "Users"],
         icon: <IconBilling />,
       },
       {

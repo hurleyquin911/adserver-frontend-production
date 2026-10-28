@@ -18,7 +18,7 @@ import { Card, EmptyRow, ErrorBanner, FieldHint, PageHeader, StatusBadge } from 
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { emptyFilterText, matchesQuery } from "@/lib/listFilter";
-import { isSuperadmin } from "@/lib/roles";
+import { needsBrand } from "@/lib/roles";
 import { runBulkAction, useRowSelection } from "@/lib/rowSelection";
 
 type Campaign = {
@@ -53,14 +53,16 @@ function CampaignsBody() {
   const canWrite = hasPermission("campaign:write");
   const router = useRouter();
   const search = useSearchParams();
-  const brandLocked = !isSuperadmin(user?.role?.name);
+  const brandLocked = needsBrand(user?.role?.name);
   const lockedBrandId = brandLocked ? user?.advertiser_id || "" : "";
 
   const [rows, setRows] = useState<Campaign[]>([]);
   const [advertisers, setAdvertisers] = useState<Advertiser[]>([]);
   const [query, setQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-  const [filterAdvertiser, setFilterAdvertiser] = useState("");
+  const [filterAdvertiser, setFilterAdvertiser] = useState(
+    () => search.get("advertiser_id") || ""
+  );
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -172,7 +174,7 @@ function CampaignsBody() {
 
   function openCreate() {
     resetFields({
-      advertiserId: lockedBrandId || advertisers[0]?.id || "",
+      advertiserId: lockedBrandId || filterAdvertiser || advertisers[0]?.id || "",
     });
     setFormError(null);
     setFormOpen(true);

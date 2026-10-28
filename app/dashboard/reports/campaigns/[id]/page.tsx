@@ -225,7 +225,7 @@ function CampaignReportBody() {
       {m && camp && (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { label: "Ad request", value: num(m.request) },
+            ...(showBrand ? [{ label: "Ad request", value: num(m.request) }] : []),
             { label: "Impression", value: num(m.impression) },
             { label: "Viewable", value: `${num(m.viewable_impression)} (${pct(m.viewability_rate_pct)})` },
             { label: "Klik", value: `${num(m.click)} (${pct(m.ctr_pct)})` },
@@ -258,7 +258,7 @@ function CampaignReportBody() {
             <thead>
               <tr>
                 <th>Tanggal</th>
-                <th>Request</th>
+                {showBrand && <th>Ad request</th>}
                 <th>Impression</th>
                 <th>Viewable</th>
                 <th>Klik</th>
@@ -267,11 +267,13 @@ function CampaignReportBody() {
               </tr>
             </thead>
             <tbody>
-              {byDay.length === 0 && <EmptyRow cols={7} text="Tidak ada data di rentang ini." />}
+              {byDay.length === 0 && (
+                <EmptyRow cols={showBrand ? 7 : 6} text="Tidak ada data di rentang ini." />
+              )}
               {byDay.map((r) => (
                 <tr key={r.bucket}>
                   <td className="font-medium">{fmtDateId(r.bucket)}</td>
-                  <td>{num(r.request)}</td>
+                  {showBrand && <td>{num(r.request)}</td>}
                   <td>{num(r.impression)}</td>
                   <td>{num(r.viewable_impression)}</td>
                   <td>{num(r.click)}</td>

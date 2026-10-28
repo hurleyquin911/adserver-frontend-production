@@ -137,8 +137,7 @@ export default function CreativeReviewPage() {
 
   function continueToAdTag() {
     if (!creative || !creative.preview_ready || !visualReviewed || !clickThroughChecked) return;
-    const params = new URLSearchParams({ size: `${creative.width}x${creative.height}` });
-    if (amSuperadmin) params.set("advertiser_id", creative.campaign.advertiser_id);
+    const params = new URLSearchParams({ creative_id: creative.id });
     router.push(`/dashboard/tag?${params.toString()}`);
   }
 
@@ -202,7 +201,7 @@ export default function CreativeReviewPage() {
                       </p>
                       {canUpload && (
                         <Link
-                          href={`/dashboard/campaigns?c=${encodeURIComponent(creative.campaign.id)}&fix=${encodeURIComponent(creative.id)}`}
+                          href={`/dashboard/creatives/upload?fix=${encodeURIComponent(creative.id)}`}
                           className="btn-primary mt-4 inline-flex"
                         >
                           Fix upload
@@ -289,7 +288,7 @@ export default function CreativeReviewPage() {
                   </dl>
                   {canUpload && (
                     <Link
-                      href={`/dashboard/campaigns?c=${encodeURIComponent(creative.campaign.id)}&fix=${encodeURIComponent(creative.id)}`}
+                      href={`/dashboard/creatives/upload?fix=${encodeURIComponent(creative.id)}`}
                       className="btn-link mt-4 inline-flex text-xs"
                     >
                       Edit creative details

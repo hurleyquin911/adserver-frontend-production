@@ -145,7 +145,7 @@ export default function UsersPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (brandRequired && !advertiserId) {
-      setFormError("Pilih Brand untuk role Admin atau Users.");
+      setFormError("Pilih Brand untuk role Users.");
       return;
     }
     const wantsPassword = !editId || password.trim().length > 0 || passwordConfirm.trim().length > 0;
@@ -241,7 +241,7 @@ export default function UsersPage() {
       <PageHeader
         eyebrow="Akses"
         title="Users"
-        subtitle="Kelola akun Superadmin, Admin, dan Users. Hanya Superadmin. Admin & Users wajib terikat Brand."
+        subtitle="Kelola akun Superadmin, Admin, dan Users. Hanya Superadmin. Users terikat ke satu Brand."
         action={
           <button type="button" className="btn-primary" onClick={openCreate}>
             Tambah User
@@ -479,8 +479,8 @@ export default function UsersPage() {
             <label className="block text-sm font-medium">
               Brand
               {brandRequired
-                ? " (wajib untuk Admin dan Users)"
-                : " (tidak perlu untuk Superadmin)"}
+                ? " (wajib untuk Users)"
+                : " (tidak perlu untuk Superadmin atau Admin)"}
             </label>
             <select
               required={brandRequired}
@@ -497,8 +497,8 @@ export default function UsersPage() {
               ))}
             </select>
             <FieldHint>
-              Admin dan Users terhubung ke satu Brand. Di dashboard mereka hanya melihat
-              campaign Brand itu, tanpa label nama Brand.
+              Users terhubung ke satu Brand dan hanya melihat campaign Brand tersebut.
+              Admin bekerja lintas Brand.
             </FieldHint>
           </div>
           <div>

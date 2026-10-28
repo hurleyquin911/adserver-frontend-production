@@ -5,10 +5,19 @@ import { useSearchParams } from "next/navigation";
 import PermissionGate from "@/components/PermissionGate";
 import { Card, ErrorBanner, PageHeader } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
-import { isSuperadmin } from "@/lib/roles";
 
-type BrandOpt = { id: string; name: string; status?: string };
+type CreativeOption = {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  status: string;
+  campaign: {
+    id: string;
+    name: string;
+    advertiser?: { id: string; name: string };
+  };
+};
 
 type MacroSet = {
   id: string;
@@ -44,6 +53,14 @@ type TagData = {
     tag_key: string;
     status: string;
   };
+  creative?: {
+    id: string;
+    name: string;
+    status: string;
+    width: number;
+    height: number;
+    campaign: { id: string; name: string; status: string };
+  } | null;
   macros?: {
     active: MacroSet;
     sets: MacroSet[];
@@ -111,17 +128,14 @@ export default function TagPage() {
 
 function TagPageContent() {
   const searchParams = useSearchParams();
-  const requestedAdvertiserId = searchParams.get("advertiser_id") || "";
-  const requestedSize = searchParams.get("size") || "";
-  const { user } = useAuth();
-  const amSuperadmin = isSuperadmin(user?.role?.name);
-  const [brands, setBrands] = useState<BrandOpt[]>([]);
-  const [advertiserId, setAdvertiserId] = useState<string>("");
+  const requestedCreativeId = searchParams.get("creative_id") || "";
+  const [creatives, setCreatives] = useState<CreativeOption[]>([]);
+  const [creativeId, setCreativeId] = useState(requestedCreativeId);
   const [catalog, setCatalog] = useState<TagData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [bootLoading, setBootLoading] = useState(true);
+  const [catalogLoading, setCatalogLoading] = useState(false);
 
-  const [sizeKey, setSizeKey] = useState<string>("300x250");
   const [macroId, setMacroId] = useState<string>("dv360");
   const [format, setFormat] = useState<"script" | "iframe" | "html">("script");
 
@@ -130,61 +144,62 @@ function TagPageContent() {
   const [resultKey, setResultKey] = useState(0);
 
   useEffect(() => {
-    if (!amSuperadmin) return;
-    api<{ data: BrandOpt[] }>("/api/advertisers")
-      .then((r) => {
-        const active = r.data.filter((b) => b.status !== "inactive");
-        const available = active.length ? active : r.data;
-        setBrands(available);
-        const requested = available.find((brand) => brand.id === requestedAdvertiserId);
-        if (requested) setAdvertiserId(requested.id);
-        else if (!advertiserId && available[0]) setAdvertiserId(available[0].id);
-      })
-      .catch(() => setBrands([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amSuperadmin, requestedAdvertiserId]);
-
-  /** Katalog awal: daftar ukuran + set macro (tanpa regenerate tiap ganti opsi). */
-  useEffect(() => {
     let cancelled = false;
-    async function loadCatalog() {
+    async function loadCreatives() {
       setBootLoading(true);
       setError(null);
-      setGenerated(null);
       try {
-        if (amSuperadmin && !advertiserId) {
-          setCatalog(null);
-          setBootLoading(false);
-          return;
-        }
-        const params = new URLSearchParams();
-        if (amSuperadmin && advertiserId) params.set("advertiser_id", advertiserId);
-        params.set("macros", "dv360");
-        const r = await api<{ data: TagData }>(`/api/tag?${params}`);
+        const result = await api<{ data: CreativeOption[] }>("/api/creatives");
         if (cancelled) return;
-        setCatalog(r.data);
-        const sizes = r.data.sizes || [];
-        setSizeKey(
-          sizes.find((size) => size.size === requestedSize)?.size ||
-            r.data.primary_size ||
-            sizes[0]?.size ||
-            "300x250"
-        );
-        setMacroId(r.data.macros?.sets?.[0]?.id || "dv360");
+        setCreatives(result.data);
+        const selected = result.data.find((creative) => creative.id === requestedCreativeId);
+        setCreativeId(selected?.id ?? "");
       } catch (e) {
         if (!cancelled) {
-          setCatalog(null);
-          setError(e instanceof ApiError ? e.message : "Gagal memuat katalog tag");
+          setError(e instanceof ApiError ? e.message : "Gagal memuat creative");
         }
       } finally {
         if (!cancelled) setBootLoading(false);
       }
     }
-    loadCatalog();
+    void loadCreatives();
     return () => {
       cancelled = true;
     };
-  }, [amSuperadmin, advertiserId, requestedSize]);
+  }, [requestedCreativeId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCatalog() {
+      if (!creativeId) {
+        setCatalog(null);
+        setCatalogLoading(false);
+        return;
+      }
+      setCatalogLoading(true);
+      setGenerated(null);
+      try {
+        const params = new URLSearchParams();
+        params.set("creative_id", creativeId);
+        params.set("macros", "dv360");
+        const r = await api<{ data: TagData }>(`/api/tag?${params}`);
+        if (cancelled) return;
+        setCatalog(r.data);
+        setMacroId(r.data.macros?.sets?.[0]?.id || "dv360");
+      } catch (e) {
+        if (!cancelled) {
+          setCatalog(null);
+          setError(e instanceof ApiError ? e.message : "Gagal memuat tag creative");
+        }
+      } finally {
+        if (!cancelled) setCatalogLoading(false);
+      }
+    }
+    void loadCatalog();
+    return () => {
+      cancelled = true;
+    };
+  }, [creativeId]);
 
   const macroSets = useMemo(() => catalog?.macros?.sets || [], [catalog]);
   const macroGroups = useMemo(() => {
@@ -202,23 +217,24 @@ function TagPageContent() {
     [macroSets, macroId]
   );
 
-  const sizeOptions = catalog?.sizes || [];
+  const selectedCreative = creatives.find((creative) => creative.id === creativeId) || null;
+  const sizeKey = selectedCreative ? `${selectedCreative.width}x${selectedCreative.height}` : "";
 
   const generate = useCallback(async () => {
-    if (amSuperadmin && !advertiserId) return;
+    if (!creativeId) return;
     setGenerating(true);
     setError(null);
     setGenerated(null);
     try {
       const params = new URLSearchParams();
-      if (amSuperadmin && advertiserId) params.set("advertiser_id", advertiserId);
+      params.set("creative_id", creativeId);
       params.set("macros", macroId);
       const [r] = await Promise.all([
         api<{ data: TagData }>(`/api/tag?${params}`),
         sleep(750),
       ]);
       const sizes = r.data.sizes || [];
-      const row = sizes.find((s) => s.size === sizeKey) || sizes[0];
+      const row = sizes[0];
       if (!row) throw new Error("Ukuran tag tidak tersedia");
       const macro = r.data.macros?.active || selectedMacroMeta;
       if (!macro) throw new Error("Set macro tidak tersedia");
@@ -238,66 +254,74 @@ function TagPageContent() {
     } finally {
       setGenerating(false);
     }
-  }, [amSuperadmin, advertiserId, macroId, sizeKey, format, selectedMacroMeta]);
+  }, [creativeId, macroId, format, selectedMacroMeta]);
 
   return (
     <PermissionGate permission="campaign:read" redirect>
       <PageHeader
-        eyebrow="Third-party"
+        eyebrow="Creative-specific"
         title="Ad tags DSP / SSP"
-        subtitle="Atur ukuran, platform, dan format — lalu Generate untuk membuat tag."
+        subtitle="Pilih creative, lalu buat tag DSP yang hanya akan menayangkan creative tersebut."
       />
       <ErrorBanner message={error} />
 
-      {amSuperadmin && (
-        <Card className="mb-4 p-4">
+      <Card className="mb-4 p-4">
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] md:items-end">
           <label className="block text-sm font-medium text-[var(--ink)]">
-            Brand
+            Creative
             <select
               className="field mt-1"
-              value={advertiserId}
+              value={creativeId}
               onChange={(e) => {
                 setGenerated(null);
-                setAdvertiserId(e.target.value);
+                setCatalog(null);
+                setCreativeId(e.target.value);
               }}
+              disabled={bootLoading || generating}
             >
-              {!brands.length && <option value="">Belum ada brand</option>}
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
+              <option value="">Pilih creative</option>
+              {creatives.map((creative) => (
+                <option key={creative.id} value={creative.id}>
+                  {creative.name} · {creative.width}×{creative.height} · {creative.campaign.name}
                 </option>
               ))}
             </select>
           </label>
+          {selectedCreative && (
+            <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm">
+              <p className="font-semibold">{selectedCreative.name}</p>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                {selectedCreative.campaign.advertiser?.name ?? selectedCreative.campaign.name}
+                {" · "}{selectedCreative.campaign.name}
+                {" · "}{sizeKey}
+                {" · "}{selectedCreative.status}
+              </p>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {(bootLoading || catalogLoading) && (
+        <p className="mt-4 text-sm text-[var(--muted)]">
+          {bootLoading ? "Memuat daftar creative..." : "Memuat opsi tag creative..."}
+        </p>
+      )}
+      {!bootLoading && !creatives.length && (
+        <Card className="p-6 text-center">
+          <p className="font-semibold">Belum ada creative</p>
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            Upload dan review creative terlebih dahulu sebelum membuat ad tag.
+          </p>
         </Card>
       )}
 
-      {bootLoading && <p className="mt-4 text-sm text-[var(--muted)]">Memuat…</p>}
-
-      {catalog && !bootLoading && (
+      {catalog && !catalogLoading && (
         <Card className="mt-4 p-5">
-          <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end">
-            <label className="block text-sm font-medium">
-              Ukuran (IAB)
-              <select
-                className="field mt-1"
-                value={sizeKey}
-                onChange={(e) => {
-                  setGenerated(null);
-                  setSizeKey(e.target.value);
-                }}
-                disabled={generating}
-              >
-                {sizeOptions.map((s) => (
-                  <option key={s.size} value={s.size}>
-                    {s.size}
-                    {s.eligible_count > 0
-                      ? ` · ${s.eligible_count} creative`
-                      : " · belum ada creative"}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+            <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2.5">
+              <p className="text-xs text-[var(--muted)]">Creative size</p>
+              <p className="mt-1 text-sm font-semibold">{sizeKey}</p>
+            </div>
             <label className="block text-sm font-medium">
               Platform / set macro
               <select
@@ -342,7 +366,7 @@ function TagPageContent() {
                 generating ? " tag-generate-pulse opacity-90" : ""
               }`}
               onClick={() => generate()}
-              disabled={generating || (amSuperadmin && !advertiserId)}
+              disabled={generating || !creativeId || catalogLoading}
             >
               {generating ? (
                 <>

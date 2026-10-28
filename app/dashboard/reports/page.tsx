@@ -60,7 +60,6 @@ function ReportsContent() {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const showBrand = isSuperadmin(user?.role?.name);
-  const unscoped = user?.advertiser_id == null;
 
   useEffect(() => {
     let cancelled = false;
@@ -113,7 +112,7 @@ function ReportsContent() {
         subtitle="Ringkasan per campaign atau creative. Buka baris campaign untuk angka harian dan breakdown."
         action={
           <div className="flex flex-wrap gap-2">
-            {unscoped && (
+            {showBrand && (
               <>
                 <Link href={`/dashboard/reports/publishers?from=${from}&to=${to}`} className="btn-ghost">
                   Publisher

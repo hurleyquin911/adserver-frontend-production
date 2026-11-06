@@ -7,7 +7,7 @@ import PermissionGate from "@/components/PermissionGate";
 import { Card, ErrorBanner, PageHeader } from "@/components/ui";
 import { ApiError, api, apiFormData } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { isAdmin, isSuperadmin } from "@/lib/roles";
+import { isAdmin, isSuperadmin, isViewOnlyRole } from "@/lib/roles";
 
 type Campaign = {
   id: string;
@@ -62,9 +62,10 @@ function UploadCreativeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, hasPermission } = useAuth();
+  const viewOnly = isViewOnlyRole(user?.role?.name);
   const superadmin = isSuperadmin(user?.role?.name);
   const canOrganizeBrands = superadmin || isAdmin(user?.role?.name);
-  const canWriteCampaign = hasPermission("campaign:write");
+  const canWriteCampaign = hasPermission("campaign:write") && !viewOnly;
   const fixId = searchParams.get("fix");
   const initialCampaignId = searchParams.get("campaign_id") || "";
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -86,6 +87,11 @@ function UploadCreativeContent() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (viewOnly) router.replace("/dashboard/creatives");
+  }, [viewOnly, router]);
+
+  useEffect(() => {
+    if (viewOnly) return;
     let cancelled = false;
     async function loadFormData() {
       try {
@@ -121,7 +127,7 @@ function UploadCreativeContent() {
     return () => {
       cancelled = true;
     };
-  }, [fixId, initialCampaignId]);
+  }, [fixId, initialCampaignId, viewOnly]);
 
   const availableCampaigns = useMemo(
     () => campaigns.filter((campaign) => !brandId || campaign.advertiser_id === brandId),
@@ -129,6 +135,7 @@ function UploadCreativeContent() {
   );
 
   async function createBrand() {
+    if (viewOnly) return;
     const trimmedName = newBrandName.trim();
     if (!trimmedName) {
       setError("Masukkan nama Brand.");
@@ -181,6 +188,7 @@ function UploadCreativeContent() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (viewOnly) return;
     setError(null);
     if (!file && !fixId) {
       setError("Pilih file creative ZIP terlebih dahulu.");
@@ -220,6 +228,12 @@ function UploadCreativeContent() {
   }
 
   const selectedCampaign = campaigns.find((campaign) => campaign.id === campaignId);
+
+  if (viewOnly) {
+    return (
+      <p className="py-8 text-center text-sm text-[var(--muted)]">Mengalihkan...</p>
+    );
+  }
 
   return (
     <PermissionGate permission="creative:upload" redirect>

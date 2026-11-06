@@ -18,7 +18,7 @@ import { Card, EmptyRow, ErrorBanner, FieldHint, PageHeader, StatusBadge } from 
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { emptyFilterText, matchesQuery } from "@/lib/listFilter";
-import { needsBrand } from "@/lib/roles";
+import { isViewOnlyRole, needsBrand } from "@/lib/roles";
 import { runBulkAction, useRowSelection } from "@/lib/rowSelection";
 
 type Campaign = {
@@ -50,7 +50,8 @@ export default function CampaignsPage() {
 
 function CampaignsBody() {
   const { user, hasPermission } = useAuth();
-  const canWrite = hasPermission("campaign:write");
+  const viewOnly = isViewOnlyRole(user?.role?.name);
+  const canWrite = hasPermission("campaign:write") && !viewOnly;
   const router = useRouter();
   const search = useSearchParams();
   const brandLocked = needsBrand(user?.role?.name);
@@ -208,6 +209,7 @@ function CampaignsBody() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!canWrite) return;
     setFormError(null);
     setSaving(true);
     const body = {
@@ -235,6 +237,7 @@ function CampaignsBody() {
   }
 
   async function remove(id: string) {
+    if (!canWrite) return;
     if (!confirm("Hapus campaign?")) return;
     try {
       await api(`/api/campaigns/${id}`, { method: "DELETE" });
@@ -246,6 +249,7 @@ function CampaignsBody() {
   }
 
   async function bulk(fn: (id: string) => Promise<void>, confirmText?: string) {
+    if (!canWrite) return;
     setBusy(true);
     setError(null);
     try {
@@ -530,8 +534,8 @@ function CampaignsBody() {
               <CampaignCreativesPanel
                 key={detailCampaign.id}
                 campaign={detailCampaign}
-                autoUpload={uploadRequested}
-                autoEditCreativeId={fixCreativeId}
+                autoUpload={!viewOnly && uploadRequested}
+                autoEditCreativeId={viewOnly ? null : fixCreativeId}
                 onClose={closePanel}
                 onChanged={load}
               />

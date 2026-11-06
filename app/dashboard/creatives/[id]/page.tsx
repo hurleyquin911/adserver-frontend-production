@@ -7,7 +7,7 @@ import PermissionGate from "@/components/PermissionGate";
 import { Card, ErrorBanner, PageHeader } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { isSuperadmin } from "@/lib/roles";
+import { isViewOnlyRole } from "@/lib/roles";
 import { IFRAME_SANDBOX } from "@/lib/sandbox";
 
 type CreativeDetails = {
@@ -110,8 +110,7 @@ export default function CreativeReviewPage() {
   const [clickThroughChecked, setClickThroughChecked] = useState(false);
   const [showDestination, setShowDestination] = useState(false);
   const [replayKey, setReplayKey] = useState(0);
-  const canUpload = hasPermission("creative:upload");
-  const amSuperadmin = isSuperadmin(user?.role?.name);
+  const canUpload = hasPermission("creative:upload") && !isViewOnlyRole(user?.role?.name);
 
   useEffect(() => {
     let cancelled = false;

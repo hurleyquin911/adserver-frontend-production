@@ -7,6 +7,7 @@ import PermissionGate from "@/components/PermissionGate";
 import { Card, EmptyRow, ErrorBanner, PageHeader } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { isViewOnlyRole } from "@/lib/roles";
 
 type Creative = {
   id: string;
@@ -42,8 +43,8 @@ export default function CreativesPage() {
 function CreativesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { hasPermission } = useAuth();
-  const canUpload = hasPermission("creative:upload");
+  const { user, hasPermission } = useAuth();
+  const canUpload = hasPermission("creative:upload") && !isViewOnlyRole(user?.role?.name);
   const [rows, setRows] = useState<Creative[]>([]);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<Tab>(() => {

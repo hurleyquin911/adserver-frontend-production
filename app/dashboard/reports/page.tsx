@@ -8,7 +8,7 @@ import { Card, EmptyRow, ErrorBanner, PageHeader } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { campaignReportHref, Metrics, num, paceClass, pct, rangeFromPreset } from "@/lib/metrics";
-import { isSuperadmin } from "@/lib/roles";
+import { isSuperadmin, isViewOnlyRole } from "@/lib/roles";
 
 type ViewMode = "campaign" | "creative";
 
@@ -60,6 +60,7 @@ function ReportsContent() {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const showBrand = isSuperadmin(user?.role?.name);
+  const canAggregate = hasPermission("report:aggregate") && !isViewOnlyRole(user?.role?.name);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +86,7 @@ function ReportsContent() {
   }, [from, to, view, refreshKey]);
 
   async function refreshNow() {
+    if (!canAggregate) return;
     setLoading(true);
     setError(null);
     try {
@@ -128,7 +130,7 @@ function ReportsContent() {
 
       <p className="text-sm text-[var(--muted)]">
         Data diperbarui tiap 5 menit.
-        {hasPermission("report:aggregate") && (
+        {canAggregate && (
           <button type="button" className="btn-link ml-2" onClick={refreshNow}>
             Perbarui sekarang
           </button>

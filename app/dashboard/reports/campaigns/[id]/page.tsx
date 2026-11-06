@@ -26,7 +26,7 @@ import {
   pct,
   rangeFromPreset,
 } from "@/lib/metrics";
-import { isSuperadmin } from "@/lib/roles";
+import { isSuperadmin, isViewOnlyRole } from "@/lib/roles";
 
 type Summary = {
   campaign: {
@@ -115,7 +115,7 @@ function CampaignReportBody() {
     setRefreshing(true);
     setError(null);
     try {
-      if (hasPermission("report:aggregate")) {
+      if (hasPermission("report:aggregate") && !isViewOnlyRole(user?.role?.name)) {
         await api("/api/reports/aggregate", { method: "POST", json: {} });
       }
       await load();

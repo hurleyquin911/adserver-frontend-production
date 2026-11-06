@@ -15,7 +15,7 @@ import {
   pct,
   rangeFromPreset,
 } from "@/lib/metrics";
-import { isSuperadmin } from "@/lib/roles";
+import { isSuperadmin, isViewOnlyRole } from "@/lib/roles";
 import { IFRAME_SANDBOX } from "@/lib/sandbox";
 
 export type CampaignSummary = {
@@ -181,6 +181,7 @@ export function CampaignCreativesPanel({
 }: Props) {
   const { hasPermission, user } = useAuth();
   const showBrand = isSuperadmin(user?.role?.name);
+  const viewOnly = isViewOnlyRole(user?.role?.name);
   const canReport = hasPermission("report:read");
   const campaignId = campaign.id;
   const [rows, setRows] = useState<Creative[]>([]);
@@ -194,7 +195,7 @@ export function CampaignCreativesPanel({
   const [miniReport, setMiniReport] = useState<CampaignMiniReport | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
 
-  const [formOpen, setFormOpen] = useState(autoUpload);
+  const [formOpen, setFormOpen] = useState(autoUpload && !viewOnly);
   const [editId, setEditId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [width, setWidth] = useState("300");
@@ -218,8 +219,8 @@ export function CampaignCreativesPanel({
     const creativeToFix = autoEditCreativeId
       ? cr.data.find((row) => row.id === autoEditCreativeId)
       : undefined;
-    if (creativeToFix) openEdit(creativeToFix);
-  }, [campaignId, autoEditCreativeId]);
+    if (creativeToFix && !viewOnly) openEdit(creativeToFix);
+  }, [campaignId, autoEditCreativeId, viewOnly]);
 
   const loadMiniReport = useCallback(async () => {
     if (!canReport) {
@@ -251,6 +252,7 @@ export function CampaignCreativesPanel({
   }, [load, loadMiniReport]);
 
   function openCreate() {
+    if (viewOnly) return;
     setEditId(null);
     setName("");
     setWidth("300");
@@ -266,6 +268,7 @@ export function CampaignCreativesPanel({
   }
 
   function openEdit(row: Creative) {
+    if (viewOnly) return;
     setEditId(row.id);
     setName(row.name);
     setWidth(String(row.width));
@@ -297,6 +300,7 @@ export function CampaignCreativesPanel({
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (viewOnly) return;
     setFormError(null);
     const normalizedRate = cpmUsd.trim() === "" ? null : Number(cpmUsd);
     const originalRate = originalCpmUsd.trim() === "" ? null : Number(originalCpmUsd);
@@ -367,6 +371,7 @@ export function CampaignCreativesPanel({
   }
 
   async function remove(id: string) {
+    if (viewOnly) return;
     const row = rows.find((r) => r.id === id);
     const label = row?.name ? `"${row.name}"` : "creative ini";
     if (
@@ -464,9 +469,11 @@ export function CampaignCreativesPanel({
                 Full Reports
               </Link>
             )}
-            <button type="button" className="btn-primary !py-2 !px-3.5 text-xs" onClick={openCreate}>
-              Tambah creative
-            </button>
+            {!viewOnly && (
+              <button type="button" className="btn-primary !py-2 !px-3.5 text-xs" onClick={openCreate}>
+                Tambah creative
+              </button>
+            )}
             <button
               type="button"
               className="btn-ghost !py-2 !px-3 text-xs"
@@ -554,13 +561,15 @@ export function CampaignCreativesPanel({
             {!loading && rows.length === 0 && (
               <div className="rounded-xl border border-dashed border-[var(--line)] px-3 py-6 text-center">
                 <p className="text-xs text-[var(--muted)]">Belum ada creative.</p>
-                <button
-                  type="button"
-                  className="btn-primary mt-3 !py-1.5 !px-3 text-xs"
-                  onClick={openCreate}
-                >
-                  Upload ZIP
-                </button>
+                {!viewOnly && (
+                  <button
+                    type="button"
+                    className="btn-primary mt-3 !py-1.5 !px-3 text-xs"
+                    onClick={openCreate}
+                  >
+                    Upload ZIP
+                  </button>
+                )}
               </div>
             )}
             {rows.map((r, i) => {
@@ -605,26 +614,30 @@ export function CampaignCreativesPanel({
                     >
                       Preview
                     </button>
-                    <button
-                      type="button"
-                      className="act-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEdit(r);
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="act-btn act-btn-danger"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        remove(r.id);
-                      }}
-                    >
-                      Hapus
-                    </button>
+                    {!viewOnly && (
+                      <>
+                        <button
+                          type="button"
+                          className="act-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(r);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="act-btn act-btn-danger"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            remove(r.id);
+                          }}
+                        >
+                          Hapus
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               );
@@ -683,18 +696,20 @@ export function CampaignCreativesPanel({
                 {showBrand && <MetricCard label="Ad request" value={num(m?.request ?? 0)} />}
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[var(--line)] pt-4">
-                <button type="button" className="btn-ghost w-full" onClick={() => openEdit(selected)}>
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  className="btn-danger-outline w-full border border-rose-400/70 bg-rose-500/25 text-rose-100 hover:bg-rose-500/40 hover:text-white"
-                  onClick={() => remove(selected.id)}
-                >
-                  Hapus
-                </button>
-              </div>
+              {!viewOnly && (
+                <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[var(--line)] pt-4">
+                  <button type="button" className="btn-ghost w-full" onClick={() => openEdit(selected)}>
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-danger-outline w-full border border-rose-400/70 bg-rose-500/25 text-rose-100 hover:bg-rose-500/40 hover:text-white"
+                    onClick={() => remove(selected.id)}
+                  >
+                    Hapus
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -710,7 +725,7 @@ export function CampaignCreativesPanel({
       )}
 
       <Modal
-        open={formOpen}
+        open={formOpen && !viewOnly}
         title={editId ? "Edit creative" : "Upload ZIP HTML5"}
         onClose={closeForm}
         wide

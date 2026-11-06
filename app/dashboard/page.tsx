@@ -7,6 +7,7 @@ import PermissionGate from "@/components/PermissionGate";
 import { Card, EmptyRow, ErrorBanner, PageHeader } from "@/components/ui";
 import { ApiError, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { isViewOnlyRole } from "@/lib/roles";
 
 type Creative = {
   id: string;
@@ -107,8 +108,8 @@ function CreativeRow({
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { hasPermission } = useAuth();
-  const canUpload = hasPermission("creative:upload");
+  const { user, hasPermission } = useAuth();
+  const canUpload = hasPermission("creative:upload") && !isViewOnlyRole(user?.role?.name);
   const [creatives, setCreatives] = useState<Creative[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

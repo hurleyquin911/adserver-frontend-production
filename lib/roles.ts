@@ -29,3 +29,11 @@ export function isUsersRole(name?: string | null) {
 export function needsBrand(name?: string | null) {
   return isUsersRole(name);
 }
+
+/**
+ * Role Users hanya melihat data. Buat, ubah, dan hapus campaign, creative,
+ * serta mutasi data lain disembunyikan. Profil dan password tetap di halaman akun.
+ */
+export function isViewOnlyRole(name?: string | null) {
+  return isUsersRole(name);
+}
